@@ -1,0 +1,10 @@
+fastapi
+pydantic[email]
+SQLAlchemy
+passlib
+bcrypt=4.3.0
+alembic
+itsdangerous
+PyJWT
+pydantic_settings
+python-multipart
