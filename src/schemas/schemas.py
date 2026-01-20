@@ -34,3 +34,10 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+class PasswordResetRequest(BaseModel):
+    email: str
+
+class ResetPassword(BaseModel):
+    new_password: str
+    confirm_password: str

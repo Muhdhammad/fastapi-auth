@@ -1,8 +1,9 @@
 from fastapi import FastAPI, Depends, status, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
+from starlette.responses import JSONResponse
 from models.models import User
-from schemas.schemas import UserCreate, UserCreateResponse, UserLogin, Token, UserResponse
+from schemas.schemas import UserCreate, UserCreateResponse, UserLogin, Token, UserResponse, PasswordResetRequest, ResetPassword
 from database.database import get_db, create_table
 from auth.utils import hash_password, verify_password, generate_token, verify_token
 from auth.jwt import create_access_token
@@ -119,6 +120,56 @@ def protected_route(current_user: User = Depends(get_current_active_user)):
 def get_all_users(_ = Depends(RoleChecker(allowed_roles=["admin", "user"])), db: Session = Depends(get_db)):
     users = db.query(User).all()
     return users
+
+@app.put('/forget-password')
+def forget_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.email == request.email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+    reset_token = generate_token(user.email)
+    reset_link = f"http://127.0.0.1:8000/reset-password/?token={reset_token}"
+    send_email(
+        recipient=user.email,
+        subject="Reset Password",
+        body=f"Click this link to reset your password: \n\n {reset_link}"
+    )
+
+    return {
+        "message": "Password Reset link has been sent"
+    }
+
+@app.post('/reset-password')
+def reset_password(request: ResetPassword, reset_token: str = Query(...), db: Session = Depends(get_db)):
+    token_data = verify_token(token=reset_token)
+    if not token_data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+    email = token_data.get("email")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"Internal server err")
+
+    new_password = request.new_password
+    confirm_password = request.confirm_password
+
+    if new_password != confirm_password:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Password Mismatch")
+
+    hashed_password = hash_password(new_password)
+    user.password = hashed_password
+
+    db.commit()
+    db.refresh(user)
+
+    return JSONResponse(
+        status_code=status.HTTP_200_OK,
+        content={
+            "message": "Password Changed Successfully",
+            "success": True,
+            "status_code": status.HTTP_200_OK
+        }
+    )
+    
 
 if __name__ == "__main__":
     uvicorn.run(app, host="127.0.0.1", port=8002)
