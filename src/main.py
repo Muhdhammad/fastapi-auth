@@ -1,18 +1,37 @@
+# Standard library
+from datetime import datetime, timedelta
+
+# Third-party libraries
 from fastapi import FastAPI, Depends, status, HTTPException, Query
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.middleware import SlowAPIMiddleware
+from slowapi.errors import RateLimitExceeded
+import uvicorn
+
+# Local app modules
 from models.models import User
-from schemas.schemas import UserCreate, UserCreateResponse, UserLogin, Token, UserResponse, PasswordResetRequest, ResetPassword
+from schemas.schemas import (
+    UserCreate, UserCreateResponse, UserLogin, Token, UserResponse,
+    PasswordResetRequest, ResetPassword
+)
 from database.database import get_db, create_table
 from auth.utils import hash_password, verify_password, generate_token, verify_token
 from auth.jwt import create_access_token
 from auth.oauth2 import get_current_active_user, RoleChecker
-from datetime import datetime, timedelta
 from services.mail import send_email
-import uvicorn
+
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["1/minute"])   # IP based rate limiting
 
 app = FastAPI(title="auth", version="1.0.0")
+
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+app.add_middleware(SlowAPIMiddleware)
 
 @app.get('/')
 def root():
@@ -69,7 +88,7 @@ def register(request: UserCreate, db: Session = Depends(get_db)):
 
 @app.get('/verify-email/')
 def verify_email(token: str = Query(...), db: Session = Depends(get_db)):    # token is taken from the query parameter: /verify-email/?token=<the-token>
-    token_data = verify_token(token=token)
+    token_data = verify_token(token=token, max_age=86400)
     email = token_data.get("email")
 
     if email is None:
@@ -140,7 +159,7 @@ def forget_password(request: PasswordResetRequest, db: Session = Depends(get_db)
 
 @app.post('/reset-password')
 def reset_password(request: ResetPassword, reset_token: str = Query(...), db: Session = Depends(get_db)):
-    token_data = verify_token(token=reset_token)
+    token_data = verify_token(token=reset_token, max_age=900)
     if not token_data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
     email = token_data.get("email")

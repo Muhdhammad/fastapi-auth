@@ -1,6 +1,6 @@
 from passlib.context import CryptContext
 # token for email verification
-from itsdangerous import URLSafeTimedSerializer, SignatureExpired, BadSignature
+from itsdangerous import URLSafeTimedSerializer, TimestampSigner, SignatureExpired, BadSignature
 from pydantic import EmailStr
 from config import Config
 
@@ -23,9 +23,9 @@ def generate_token(email: EmailStr) -> str:
     # .dumps() takes a Python object (here, the email) and serializes + signs it.
     return _token
 
-def verify_token(token: str, max_age: int = 1800):
+def verify_token(token: str, max_age: int = 900):
     try:
-        email = token_algo.loads(token, max_age=max_age) # 1800 secs = 30 mins
+        email = token_algo.loads(token, max_age=max_age) # 900 secs = 15 mins
         # .loads() verifies the token signature (checks it wasn’t tampered).
         return {"email": email, "check": True}
         

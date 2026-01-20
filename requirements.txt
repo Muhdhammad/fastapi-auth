@@ -8,3 +8,4 @@ itsdangerous
 PyJWT
 pydantic_settings
 python-multipart
+slowapi
