@@ -8,6 +8,8 @@ class Settings(BaseSettings):
 
     TOKEN_SECRET_KEY: str
 
+    FRONTEND_URL: str
+
     SMTP_EMAIL: str
     SMTP_PASSWORD: str
     SMTP_HOST: str

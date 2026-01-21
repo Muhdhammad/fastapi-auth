@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 
 # libraries
-from fastapi import APIRouter, Depends, status, HTTPException, Query
+from fastapi import APIRouter, Depends, status, HTTPException, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from starlette.responses import JSONResponse
@@ -18,11 +18,12 @@ from auth.utils import hash_password, verify_password, generate_token, verify_to
 from auth.jwt import create_access_token
 from auth.oauth2 import get_current_active_user, RoleChecker
 from services.mail import send_email
+from config import Config
 
 router = APIRouter(tags=['auth'])
 
 @router.post('/register/', status_code=status.HTTP_201_CREATED, response_model=UserCreateResponse)
-def register(request: UserCreate, db: Session = Depends(get_db)):
+def register(request: UserCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     # check if username or email already exists
     user = db.query(User).filter(
         (User.username == request.username) | (User.email == request.email)
@@ -44,8 +45,10 @@ def register(request: UserCreate, db: Session = Depends(get_db)):
 
     # email verification
     verification_token = generate_token(new_user.email)
-    verification_link = f"http://127.0.0.1:8000/verify-email/?token={verification_token}"
-    send_email(
+    verification_link = f"{Config.FRONTEND_URL}/verify-email/?token={verification_token}"
+
+    background_tasks.add_task(
+        send_email,
         recipient=new_user.email,
         subject="Account Verification",
         body=f"Hi! Click this link to verify your email:\n\n{verification_link}"
@@ -124,13 +127,15 @@ def get_all_users(_ = Depends(RoleChecker(allowed_roles=["admin", "user"])), db:
 
 
 @router.put('/forget-password')
-def forget_password(request: PasswordResetRequest, db: Session = Depends(get_db)):
+def forget_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == request.email).first()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
     reset_token = generate_token(user.email)
-    reset_link = f"http://127.0.0.1:8000/reset-password/?token={reset_token}"
-    send_email(
+    reset_link = f"{Config.FRONTEND_URL}/reset-password/?token={reset_token}"
+
+    background_tasks.add_task(
+        send_email,
         recipient=user.email,
         subject="Reset Password",
         body=f"Click this link to reset your password: \n\n {reset_link}"
@@ -171,4 +176,5 @@ def reset_password(request: ResetPassword, reset_token: str = Query(...), db: Se
             "status_code": status.HTTP_200_OK
         }
     )
+   
     
