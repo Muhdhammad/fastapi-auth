@@ -2,7 +2,6 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, declarative_base
 from pathlib import Path
 from config import Config
-
 #BASE_DIR = Path(__file__).resolve().parent.parent.parent
 #DB_PATH = BASE_DIR / "user.db"
 #SQLALCHEMY_DATABASE_URL = f"sqlite:///{DB_PATH}"

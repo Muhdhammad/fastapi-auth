@@ -18,6 +18,7 @@ from auth.utils import hash_password, verify_password, generate_token, verify_to
 from auth.jwt import create_access_token
 from auth.oauth2 import get_current_active_user, RoleChecker
 from services.mail import send_email
+from errors.errors import AuthError
 from config import Config
 
 router = APIRouter(tags=['auth'])
@@ -73,11 +74,11 @@ def verify_email(token: str = Query(...), db: Session = Depends(get_db)):    # t
     email = token_data.get("email")
 
     if email is None:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+        AuthError.invalid_or_expired()
 
     user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"User not found to verify")
+        AuthError.user_not_found()
     
     if user.is_verified == True:
         return {"message": "user is already verified"}
@@ -97,9 +98,9 @@ def login(request: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Inavlid username or password")
     if user.is_verified != True:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User is not verified")
+        AuthError.user_not_verified()
     if not verify_password(request.password, user.password):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid username or password")
+        AuthError.invalid_credentials()
 
     # create access token
     access_token_expires = timedelta(minutes=30)
@@ -130,7 +131,7 @@ def get_all_users(_ = Depends(RoleChecker(allowed_roles=["admin", "user"])), db:
 def forget_password(request: PasswordResetRequest, background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
     user = db.query(User).filter(User.email == request.email).first()
     if not user:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+        AuthError.user_not_found()
     reset_token = generate_token(user.email)
     reset_link = f"{Config.FRONTEND_URL}/reset-password/?token={reset_token}"
 
@@ -149,7 +150,7 @@ def forget_password(request: PasswordResetRequest, background_tasks: BackgroundT
 def reset_password(request: ResetPassword, reset_token: str = Query(...), db: Session = Depends(get_db)):
     token_data = verify_token(token=reset_token, max_age=900)
     if not token_data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid or expired token")
+        AuthError.invalid_or_expired()
     email = token_data.get("email")
 
     user = db.query(User).filter(User.email == email).first()

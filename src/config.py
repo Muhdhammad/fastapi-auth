@@ -1,4 +1,7 @@
 from pydantic_settings import BaseSettings, SettingsConfigDict
+from pathlib import Path
+
+SRC_DIR = Path(__file__).resolve().parent
 
 class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite:///./user.db"
@@ -15,6 +18,6 @@ class Settings(BaseSettings):
     SMTP_HOST: str
     SMTP_PORT: int
 
-    model_config = SettingsConfigDict(env_file=".env", extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(SRC_DIR / ".env"), extra="ignore")
 
 Config = Settings()
