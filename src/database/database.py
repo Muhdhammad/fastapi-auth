@@ -22,5 +22,6 @@ def get_db():
     finally:
         db.close()
 
-def create_table():
-    Base.metadata.create_all(bind=engine)
+# Done by alembic
+# def create_table():
+    # Base.metadata.create_all(bind=engine)

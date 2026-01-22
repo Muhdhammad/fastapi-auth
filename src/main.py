@@ -18,7 +18,8 @@ limiter = Limiter(key_func=get_remote_address, default_limits=["100/day"])   # I
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    create_table()  # SQLAlchemy sync function, no await
+    # create_table()  # SQLAlchemy sync function, no await
+    # done by alembic 
     yield
 
 app = FastAPI(title="auth", version="1.0.0", lifespan=lifespan)
