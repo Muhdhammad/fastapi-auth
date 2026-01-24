@@ -18,8 +18,8 @@ class User(Base):
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     # When a row is inserted, let the database automatically store the current time (UTC), and never allow it to be NULL.
 
-    totp_config = relationship("UserTOTP", back_populates="user")
-    
+    totp_config = relationship("UserTOTP", back_populates="user", uselist=False) # One to one
+
 class UserTOTP(Base):
     __tablename__ = "users_totp"
     id = Column(Integer, primary_key=True, index=True)

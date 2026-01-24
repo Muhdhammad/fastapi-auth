@@ -13,7 +13,7 @@ from starlette.responses import JSONResponse, Response
 from models.models import User, UserTOTP
 from schemas.schemas import (
     UserCreate, UserCreateResponse, UserLogin, Token, UserResponse,
-    PasswordResetRequest, ResetPassword
+    PasswordResetRequest, ResetPassword, TOTPVerify
 )
 from database.database import get_db
 from auth.utils import hash_password, verify_password, generate_token, verify_token
@@ -219,6 +219,34 @@ def enable_2fa(current_user: User = Depends(get_current_active_user), db: Sessio
         "qr_code": f"data:image/png;base64,{qr_code_base64}"
     }
                                 
+@router.post('/2fa/verify', status_code=status.HTTP_200_OK)
+def verify_2fa(request: TOTPVerify, current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+
+    if current_user.totp_config is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2fa is not enabled, Kindly enable it first")
+
+    if current_user.totp_config.is_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2FA is already enabled")
+    
+    secret_key = current_user.totp_config.secret_key
+    totp_code = request.totp_code
+
+    is_valid = TwoFactorAuth.verify_totp_code(totp_code=totp_code, secret=secret_key)
+
+    if not is_valid:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid 2FA code, please try again")
+    
+    current_user.totp_config.is_enabled = True
+    db.commit()
+
+    return {
+        "message": "2FA enabled successfully",
+        "success": True
+    }
+
+
+
+
 
 
 

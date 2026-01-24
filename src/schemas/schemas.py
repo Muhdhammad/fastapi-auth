@@ -41,3 +41,6 @@ class PasswordResetRequest(BaseModel):
 class ResetPassword(BaseModel):
     new_password: str
     confirm_password: str
+
+class TOTPVerify(BaseModel):
+    totp_code: str = Field(min_length=6, max_length=6)
