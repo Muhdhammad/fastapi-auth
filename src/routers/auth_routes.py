@@ -1,22 +1,25 @@
 # Standard library
 from datetime import datetime, timedelta
+import base64
+import PIL
 
 # libraries
 from fastapi import APIRouter, Depends, status, HTTPException, Query, BackgroundTasks
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from starlette.responses import JSONResponse
+from starlette.responses import JSONResponse, Response
 
 # Local app modules
-from models.models import User
+from models.models import User, UserTOTP
 from schemas.schemas import (
     UserCreate, UserCreateResponse, UserLogin, Token, UserResponse,
     PasswordResetRequest, ResetPassword
 )
-from database.database import get_db, create_table
+from database.database import get_db
 from auth.utils import hash_password, verify_password, generate_token, verify_token
 from auth.jwt import create_access_token
 from auth.oauth2 import get_current_active_user, RoleChecker
+from auth.totp import TwoFactorAuth
 from services.mail import send_email
 from errors.errors import AuthError
 from config import Config
@@ -177,5 +180,47 @@ def reset_password(request: ResetPassword, reset_token: str = Query(...), db: Se
             "status_code": status.HTTP_200_OK
         }
     )
-   
+
+@router.post('/2fa/enable')
+def enable_2fa(current_user: User = Depends(get_current_active_user), db: Session = Depends(get_db)):
+    
+    # if totp_config exists and already is_enabled
+    if current_user.totp_config and current_user.totp_config.is_enabled:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="2fa is already enabled")
+    
+    # if totp_config exists but not enabled
+    if current_user.totp_config:
+        totp_config = current_user.totp_config
+    else:
+        secret_key = TwoFactorAuth.generate_secret_key()
+        totp_config = UserTOTP(
+            user_id=current_user.id,
+            secret_key=secret_key
+            # We will keep is_enabled=False until user verify it
+        )
+
+    db.add(totp_config)
+    db.commit()
+    db.refresh(totp_config)
+
+    # return qrcode in base64 url
+    qr_code = TwoFactorAuth.generate_qr_code(
+        current_user.username,
+        secret=totp_config.secret_key
+    )
+
+    qr_code_base64 = base64.b64encode(qr_code).decode('utf-8')
+
+    # return Response(content=qr_code, media_type="image/png")
+
+    return {
+        "message": "Scan QR code with Google authenticator",
+        "secret": totp_config.secret_key,
+        "qr_code": f"data:image/png;base64,{qr_code_base64}"
+    }
+                                
+
+
+
+
     

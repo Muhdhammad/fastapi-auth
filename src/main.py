@@ -11,7 +11,7 @@ import uvicorn
 
 # Local app modules
 from routers import auth_routes
-from database.database import get_db, create_table
+from database.database import get_db
 
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["100/day"])   # IP based rate limiting
@@ -34,7 +34,7 @@ app.add_middleware(
     allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
-    allow_header=["*"]
+    allow_headers=["*"]
 )
 
 app.include_router(auth_routes.router)
